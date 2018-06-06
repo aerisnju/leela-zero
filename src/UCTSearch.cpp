@@ -563,7 +563,7 @@ int UCTSearch::est_playouts_left(int elapsed_centis, int time_for_move) const {
                     static_cast<int>(std::ceil(playout_rate * time_left)));
 }
 
-size_t UCTSearch::prune_noncontenders(int elapsed_centis, int time_for_move) {
+size_t UCTSearch::prune_noncontenders(int elapsed_centis, int time_for_move, bool prune) {
     auto Nfirst = 0;
     // There are no cases where the root's children vector gets modified
     // during a multithreaded search, so it is safe to walk it here without
@@ -581,7 +581,9 @@ size_t UCTSearch::prune_noncontenders(int elapsed_centis, int time_for_move) {
             const auto has_enough_visits =
                 node->get_visits() >= min_required_visits;
 
-            node->set_active(has_enough_visits);
+            if (prune) {
+                node->set_active(has_enough_visits);
+            }
             if (!has_enough_visits) {
                 ++pruned_nodes;
             }
@@ -596,7 +598,9 @@ bool UCTSearch::have_alternate_moves(int elapsed_centis, int time_for_move) {
     if (cfg_timemanage == TimeManagement::OFF) {
         return true;
     }
-    auto pruned = prune_noncontenders(elapsed_centis, time_for_move);
+    // For self play use. Disables pruning of non-contenders to not bias the training data.
+    auto prune = cfg_timemanage != TimeManagement::NO_PRUNING;
+    auto pruned = prune_noncontenders(elapsed_centis, time_for_move, prune);
     if (pruned < m_root->get_children().size() - 1) {
         return true;
     }
